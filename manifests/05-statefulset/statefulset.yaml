@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: healthcare-app
+  namespace: healthcare
+spec:
+  serviceName: "healthcare-internal"
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: healthcare-app
+  template:
+    metadata:
+      labels:
+        app: healthcare-app
+    spec:
+      serviceAccountName: healthcare-sa
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: healthcare-app
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 8080
+          name: web
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+        - name: secret-volume
+          mountPath: /etc/secrets
+          readOnly: true
+        - name: patient-data
+          mountPath: /data/healthcare
+      volumes:
+      - name: config-volume
+        configMap:
+          name: healthcare-config
+      - name: secret-volume
+        secret:
+          secretName: healthcare-secrets
+  volumeClaimTemplates:
+  - metadata:
+      name: patient-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: manual
+      resources:
+        requests:
+          storage: 1Gi
